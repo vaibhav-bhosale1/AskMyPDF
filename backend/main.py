@@ -11,13 +11,13 @@ from .database import engine, Base, get_db
 from . import models, schemas
 from .nlp_utils import process_text_and_create_vector_store, get_qa_chain
 
-# Create tables (run this once to create your tables, then you can comment it out for production)
-# models.Base.metadata.create_all(bind=engine)
+#models.Base.metadata.create_all(bind=engine)
+
 
 app = FastAPI()
 
-UPLOAD_DIR = "pdfs"
-TEXT_DIR = "extracted_texts"
+UPLOAD_DIR = "backend/pdfs"
+TEXT_DIR = "backend/extracted_texts"
 
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(TEXT_DIR, exist_ok=True)

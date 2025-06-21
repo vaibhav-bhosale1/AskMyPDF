@@ -21,10 +21,10 @@ embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
 
 # Initialize Ollama LLM
 # Ensure Ollama is running (ollama serve) and 'llama2' model is pulled (ollama run llama2)
-llm = Ollama(model="llama2", temperature=0.0) # Use the model you pulled
+llm = Ollama(model="phi3", temperature=0.0) # Use the model you pulled
 
 # Define a consistent directory for ChromaDB persistence
-CHROMA_DB_DIR = "chroma_db"
+CHROMA_DB_DIR = "backend/chroma_db"
 os.makedirs(CHROMA_DB_DIR, exist_ok=True)
 
 
