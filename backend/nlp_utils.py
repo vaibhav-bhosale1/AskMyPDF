@@ -1,30 +1,29 @@
-# backend/nlp_utils.py (updated for Local Models)
+# backend/nlp_utils.py (updated for Google Gemini API)
 import os
 from typing import List
 from dotenv import load_dotenv
 
-# LangChain imports for local models
-from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain_community.llms import Ollama
+# LangChain imports for Google Gemini
+from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import Chroma
 from langchain.chains import RetrievalQA
 from langchain.prompts import PromptTemplate
 from langchain.schema import Document
 
-load_dotenv() # Load environment variables (though not strictly needed for local models anymore unless for other config)
+load_dotenv() # Load environment variables
 
-# Initialize Local Embeddings
-# This will download the 'all-MiniLM-L6-v2' model the first time it's used.
-# You can choose other models from Hugging Face if you prefer.
-embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+# Initialize Google Gemini components
+if not os.getenv("GOOGLE_API_KEY"):
+    raise ValueError("GOOGLE_API_KEY environment variable not set.")
 
-# Initialize Ollama LLM
-# Ensure Ollama is running (ollama serve) and 'llama2' model is pulled (ollama run llama2)
-llm = Ollama(model="phi3", temperature=0.0) # Use the model you pulled
+# Using a suitable Gemini model for chat and embeddings
+# gemini-pro is good for general text, gemini-pro-vision for multimodal
+llm = ChatGoogleGenerativeAI(model="models/gemini-1.5-flash", temperature=0.0)
+embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001") # Recommended embedding model for Gemini
 
 # Define a consistent directory for ChromaDB persistence
-CHROMA_DB_DIR = "backend/chroma_db"
+CHROMA_DB_DIR = "chroma_db"
 os.makedirs(CHROMA_DB_DIR, exist_ok=True)
 
 
@@ -46,7 +45,7 @@ def process_text_and_create_vector_store(text_content: str, document_id: int):
 
     vectorstore = Chroma.from_documents(
         documents=documents,
-        embedding=embeddings,
+        embedding=embeddings, # Use Google Generative AI Embeddings
         persist_directory=CHROMA_DB_DIR,
         collection_name=collection_name
     )
@@ -64,14 +63,15 @@ def get_qa_chain(document_id: int):
 
     vectorstore = Chroma(
         persist_directory=CHROMA_DB_DIR,
-        embedding_function=embeddings,
+        embedding_function=embeddings, # Use Google Generative AI Embeddings
         collection_name=collection_name
     )
 
     if not vectorstore:
         raise ValueError(f"Vector store not found for document ID {document_id}")
 
-    prompt_template = """Use the following pieces of context to answer the the question at the end. If you don't know the answer, just say that you don't know, don't try to make up an answer.
+    prompt_template = """Use the following pieces of context to answer the user's question.
+    If you don't know the answer, just say that you don't know, don't try to make up an answer.
     Always answer as concisely as possible.
 
     {context}
@@ -85,8 +85,8 @@ def get_qa_chain(document_id: int):
     )
 
     qa_chain = RetrievalQA.from_chain_type(
-        llm,
-        retriever=vectorstore.as_retriever(),
+        llm, # Use Google Gemini LLM
+        retriever=vectorstore.as_retriever(search_kwargs={"k": 2}), # Keep k=2 for faster responses
         chain_type_kwargs={"prompt": QA_CHAIN_PROMPT},
         return_source_documents=False
     )
