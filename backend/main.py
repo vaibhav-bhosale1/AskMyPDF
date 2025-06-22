@@ -1,29 +1,42 @@
 # backend/main.py
 
 import logging
-from fastapi import FastAPI, UploadFile, File, HTTPException, Depends
-from typing import Annotated, List, Dict, Any, Optional
-import shutil
-from langchain_core.documents import Document 
+from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Form
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-import os
-import fitz
-
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
-from pydantic import BaseModel
+import fitz
+from dotenv import load_dotenv
+from werkzeug.utils import secure_filename
+import shutil
+import os
+from datetime import datetime
+from typing import Optional
 
-from .nlp_utils import process_documents_and_create_vector_store, get_qa_chain
-from .database import engine, Base, get_db
-from . import models, schemas
+from langchain_core.documents import Document
+
 from . import nlp_utils
+from . import models
+from . import schemas
+from .database import engine, Base, get_db
 
+load_dotenv()
+
+PDF_DIR = "backend/pdfs"
+TEXT_DIR = "backend/texts"
+CHROMA_DB_DIR = "backend/chroma_db"
+
+os.makedirs(PDF_DIR, exist_ok=True)
+os.makedirs(TEXT_DIR, exist_ok=True)
+os.makedirs(CHROMA_DB_DIR, exist_ok=True)
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-models.Base.metadata.create_all(bind=engine)
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
+
 origins = [
     "http://localhost:3000",
     "http://localhost:5173",
@@ -37,11 +50,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-UPLOAD_DIR = "backend/pdfs"
-TEXT_DIR = "backend/extracted_texts"
-
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-os.makedirs(TEXT_DIR, exist_ok=True)
+def generate_unique_filename(original_filename: str, db: Session) -> str:
+    name, ext = os.path.splitext(original_filename)
+    counter = 1
+    new_filename = original_filename
+    while db.query(models.Document).filter(models.Document.filename == new_filename).first():
+        new_filename = f"{name} ({counter}){ext}"
+        counter += 1
+    return new_filename
 
 @app.get("/")
 async def read_root():
@@ -50,40 +66,93 @@ async def read_root():
 
 @app.post("/upload-pdf/", response_model=schemas.DocumentResponse)
 async def upload_pdf(
-    file: Annotated[UploadFile, File()],
+    file: UploadFile = File(...),
+    action: Optional[str] = Form(None),
+    existing_document_id: Optional[int] = Form(None),
     db: Session = Depends(get_db)
 ):
-    logging.info(f"Received file upload request for: {file.filename}")
-
-    if not file.filename:
-        raise HTTPException(status_code=400, detail="Filename not provided.")
-
-    if not file.filename.endswith(".pdf"):
-        logging.warning(f"Invalid file type uploaded: {file.filename}")
-        raise HTTPException(status_code=400, detail="Invalid file type. Only PDF files are allowed.")
-
-    filename = os.path.basename(file.filename)
-    extracted_documents_with_metadata = []
-    file_path = ""  # Initialize file_path
-    text_file_path = ""  # Initialize text_file_path
-
-    existing_document = db.query(models.Document).filter(models.Document.filename == filename).first()
-
-    if existing_document:
-        logging.info(f"Document '{filename}' already exists. Using existing ID: {existing_document.id}")
-        return schemas.DocumentResponse(
-            id=existing_document.id,
-            filename=existing_document.filename,
-            uploaded_at=existing_document.uploaded_at,
-            message=f"PDF with filename '{filename}' already exists. Using existing document."
-        )
+    original_filename = secure_filename(file.filename)
+    filename_to_use = original_filename
+    file_path = ""
+    text_file_path = ""
+    db_document = None
 
     try:
-        logging.info(f"Saving new file: {filename}")
-        file_path = os.path.join(UPLOAD_DIR, filename)
+        if action == "overwrite" and existing_document_id is not None:
+            db_document = db.query(models.Document).filter(models.Document.id == existing_document_id).first()
+            if not db_document or db_document.filename != original_filename:
+                raise HTTPException(status_code=400, detail="Mismatched document ID or filename for overwrite.")
+
+            logging.info(f"Overwriting file '{original_filename}' (ID: {db_document.id}).")
+
+            old_vector_store_dir = os.path.join(CHROMA_DB_DIR, f"pdf_collection_{db_document.id}")
+            if os.path.exists(old_vector_store_dir):
+                logging.info(f"Removing old vector store: {old_vector_store_dir}")
+                shutil.rmtree(old_vector_store_dir)
+
+            old_text_file_path = os.path.join(TEXT_DIR, os.path.splitext(original_filename)[0] + ".txt")
+            if os.path.exists(old_text_file_path):
+                logging.info(f"Removing old text file: {old_text_file_path}")
+                os.remove(old_text_file_path)
+
+            file_path = os.path.join(PDF_DIR, original_filename)
+            with open(file_path, "wb") as buffer:
+                shutil.copyfileobj(file.file, buffer)
+            logging.info(f"Overwritten PDF file: {file_path}")
+
+            extracted_documents_with_metadata = []
+            with fitz.open(file_path) as doc:
+                full_text_content = ""
+                for i, page in enumerate(doc):
+                    page_text = page.get_text()
+                    full_text_content += f"\n--- Page {i+1} ---\n" + page_text
+                    extracted_documents_with_metadata.append(
+                        Document(page_content=page_text, metadata={"page": i + 1})
+                    )
+
+            text_filename = os.path.splitext(original_filename)[0] + ".txt"
+            text_file_path = os.path.join(TEXT_DIR, text_filename)
+            with open(text_file_path, "w", encoding="utf-8") as text_file:
+                text_file.write(full_text_content)
+
+            nlp_utils.process_documents_and_create_vector_store(extracted_documents_with_metadata, db_document.id)
+            logging.info(f"Vector store re-processed for existing document ID: {db_document.id}")
+
+            db_document.uploaded_at = datetime.now()
+            db.add(db_document)
+            db.commit()
+            db.refresh(db_document)
+
+            return schemas.DocumentResponse(
+                id=db_document.id,
+                filename=db_document.filename,
+                uploaded_at=db_document.uploaded_at,
+                message="PDF content updated and re-processed successfully."
+            )
+
+        elif action == "new":
+            filename_to_use = generate_unique_filename(original_filename, db)
+            logging.info(f"Uploading as new file: '{filename_to_use}'")
+
+        else:
+            existing_db_document = db.query(models.Document).filter(models.Document.filename == original_filename).first()
+            if existing_db_document:
+                logging.info(f"Duplicate filename '{original_filename}' detected for ID: {existing_db_document.id}. Awaiting user action.")
+                return JSONResponse(
+                    status_code=409,
+                    content=schemas.DuplicateFileResponse(
+                        message="File with this name already exists. What would you like to do?",
+                        existing_document_id=existing_db_document.id,
+                        filename=original_filename
+                    ).model_dump()
+                )
+            logging.info(f"Proceeding with initial upload of '{filename_to_use}'")
+
+        file_path = os.path.join(PDF_DIR, filename_to_use)
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
+        extracted_documents_with_metadata = []
         with fitz.open(file_path) as doc:
             full_text_content = ""
             for i, page in enumerate(doc):
@@ -93,17 +162,17 @@ async def upload_pdf(
                     Document(page_content=page_text, metadata={"page": i + 1})
                 )
 
-        text_filename = os.path.splitext(filename)[0] + ".txt"
+        text_filename = os.path.splitext(filename_to_use)[0] + ".txt"
         text_file_path = os.path.join(TEXT_DIR, text_filename)
         with open(text_file_path, "w", encoding="utf-8") as text_file:
             text_file.write(full_text_content)
 
-        db_document = models.Document(filename=filename)
+        db_document = models.Document(filename=filename_to_use)
         db.add(db_document)
         db.commit()
         db.refresh(db_document)
 
-        logging.info(f"File '{filename}' saved and document ID {db_document.id} created. Starting NLP processing.")
+        logging.info(f"File '{filename_to_use}' saved and document ID {db_document.id} created. Starting NLP processing.")
 
         nlp_utils.process_documents_and_create_vector_store(extracted_documents_with_metadata, db_document.id)
         logging.info(f"NLP processing complete for document ID: {db_document.id}")
@@ -114,6 +183,7 @@ async def upload_pdf(
             uploaded_at=db_document.uploaded_at,
             message="PDF uploaded and processed successfully."
         )
+
     except IntegrityError:
         db.rollback()
         if os.path.exists(file_path):
@@ -126,11 +196,11 @@ async def upload_pdf(
                 os.remove(text_file_path)
             except OSError as e:
                 logging.error(f"Failed to remove text file {text_file_path} after IntegrityError: {e}")
-        logging.error(f"IntegrityError during upload for {filename}.")
-        raise HTTPException(status_code=409, detail=f"A PDF with filename '{filename}' was concurrently added by another process.")
+        logging.error(f"IntegrityError during upload for {filename_to_use}.")
+        raise HTTPException(status_code=409, detail=f"A PDF with filename '{filename_to_use}' was concurrently added.")
     except Exception as e:
         db.rollback()
-        if os.path.exists(file_path):
+        if file_path and os.path.exists(file_path):
             try:
                 os.remove(file_path)
             except OSError as e_remove:
@@ -140,7 +210,7 @@ async def upload_pdf(
                 os.remove(text_file_path)
             except OSError as e_remove_text:
                 logging.error(f"Failed to remove text file {text_file_path} after processing error: {e_remove_text}")
-        logging.error(f"Error processing file {filename}: {e}", exc_info=True)
+        logging.error(f"Error processing file {filename_to_use}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Could not process file: {e}")
 
 @app.post("/ask-question/", response_model=schemas.AnswerResponse)
