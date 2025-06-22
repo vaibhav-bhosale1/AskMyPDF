@@ -144,7 +144,7 @@ function App() {
   }
 
   // New function to handle feedback submission
-  const handleFeedback = async (messageId, feedbackType) => {
+   const handleFeedback = async (messageId, feedbackType) => {
     // Prevent submitting feedback multiple times for the same message
     const messageIndex = conversation.findIndex(msg => msg.id === messageId);
     if (messageIndex === -1 || conversation[messageIndex].feedbackGiven) {
@@ -153,16 +153,21 @@ function App() {
 
     const aiMessage = conversation[messageIndex];
     // Find the corresponding user question right before this AI message
+    // This logic might need to be more robust if conversation history is complex
     const userQuestionIndex = conversation.slice(0, messageIndex).reverse().findIndex(msg => msg.type === 'user');
     const userQuestion = userQuestionIndex !== -1 ? conversation[messageIndex - 1 - userQuestionIndex].text : "N/A";
 
+    // --- MODIFICATION START ---
+    // Ensure feedback_type is a string matching backend schema
+    const feedbackTypeString = feedbackType === 'positive' ? 'helpful' : 'not_helpful';
 
     const feedbackPayload = {
       document_id: documentId,
       question: userQuestion,
       answer: aiMessage.text,
-      feedback_type: feedbackType === 'positive' // Convert to boolean: true for positive, false for negative
+      feedback_type: feedbackTypeString // <--- Use the string type here
     };
+    // --- MODIFICATION END ---
 
     try {
       const response = await fetch(`${API_BASE_URL}/submit-feedback/`, {
@@ -182,15 +187,27 @@ function App() {
             )
         );
       } else {
-        const errorData = await response.json();
-        console.error("Failed to submit feedback:", errorData.detail || response.statusText);
-        setError(`Failed to submit feedback: ${errorData.detail || response.statusText}`);
+        // --- MODIFICATION START ---
+        // Log the full response status and text
+        console.error("Failed to submit feedback. Status:", response.status, response.statusText);
+        let errorDetail = "Unknown error";
+        try {
+            const errorData = await response.json();
+            console.error("Failed to submit feedback. Backend error data:", errorData);
+            errorDetail = errorData.detail || errorData.message || JSON.stringify(errorData);
+        } catch (jsonError) {
+            console.error("Failed to parse error response as JSON:", jsonError);
+            errorDetail = response.statusText; // Fallback to status text
+        }
+        setError(`Failed to submit feedback: ${errorDetail}`);
+        // --- MODIFICATION END ---
       }
     } catch (error) {
       console.error("Error submitting feedback:", error);
       setError(`Error submitting feedback: ${error.message}`);
     }
   };
+
 
 
   // Helper to extract unique page numbers for display
