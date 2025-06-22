@@ -2,6 +2,7 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException, Depends
 from typing import Annotated
 import shutil
+from fastapi.middleware.cors import CORSMiddleware
 import os
 import fitz # PyMuPDF
 from sqlalchemy.orm import Session
@@ -15,6 +16,20 @@ from .nlp_utils import process_text_and_create_vector_store, get_qa_chain
 
 
 app = FastAPI()
+origins = [
+    "http://localhost:3000", # Default for Create React App
+    "http://localhost:5173", # Default for Vite React
+    # Add any other origins where your frontend might be hosted (e.g., your deployment URL)
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"], # Allows all HTTP methods (GET, POST, PUT, DELETE, etc.)
+    allow_headers=["*"], # Allows all headers
+)
+
 
 UPLOAD_DIR = "backend/pdfs"
 TEXT_DIR = "backend/extracted_texts"
