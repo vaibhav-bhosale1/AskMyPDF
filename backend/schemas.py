@@ -1,16 +1,20 @@
-# backend/schemas.py
 from pydantic import BaseModel
 from datetime import datetime
+from typing import Optional
 
-class DocumentBase(BaseModel):
-    filename: str
-
-class DocumentCreate(DocumentBase):
-    pass
-
-class Document(DocumentBase):
+class DocumentResponse(BaseModel):
     id: int
+    filename: str
     uploaded_at: datetime
+    message: Optional[str] = None
 
     class Config:
-        from_attributes = True # or orm_mode = True for older Pydantic
+        from_attributes = True
+
+class QuestionRequest(BaseModel):
+    document_id: int
+    question: str
+
+class AnswerResponse(BaseModel):
+    answer: str
+    document_id: int
