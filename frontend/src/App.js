@@ -1,7 +1,9 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react" // Import useEffect and useRef
-
+import DuplicateFileModal from "./components/DuplicateFileModal";
+import ChatArea from "./components/ChatArea";
+import MessageInput from "./components/MessageInput";
 const API_BASE_URL = "http://127.0.0.1:8000"
 
 function App() {
@@ -296,169 +298,31 @@ function App() {
         </div>
 
         {/* Chat Area */}
-        <div className="flex-1 overflow-y-auto px-6 lg:px-8 py-4 lg:py-6 space-y-4 lg:space-y-6">
-          {/* Show when no PDF uploaded */}
-          {!documentId && conversation.length === 0 && !loading && !error && (
-            <div className="text-center text-gray-500 mt-8">
-              <p className="text-sm lg:text-base">
-                Upload a PDF and start asking questions!
-              </p>
-            </div>
-          )}
-
-          {/* Show when PDF uploaded, but no questions yet */}
-          {documentId && conversation.length === 0 && !loading && !error && (
-            <div className="text-center text-green-600 mt-8">
-              <p className="text-sm lg:text-base">
-                Now you can ask questions about your PDF!
-              </p>
-            </div>
-          )}
-
-          {conversation.map((msg, index) => (
-            <div key={msg.id} className="flex items-start space-x-3 lg:space-x-4"> {/* Use msg.id as key */}
-              {/* Avatar */}
-              <div
-                className={`w-10 h-10 lg:w-12 lg:h-12 rounded-full flex items-center justify-center text-white font-semibold text-sm lg:text-base flex-shrink-0 ${
-                  msg.type === "user" ? "bg-purple-500" : "bg-green-500"
-                }`}
-              >
-                {msg.type === "user" ? "S" : "ai"}
-              </div>
-
-              {/* Message Content */}
-              <div className="flex-1 lg:max-w-3xl bg-gray-50 rounded-2xl rounded-tl-sm px-4 lg:px-6 py-3 lg:py-4">
-                <p className="text-gray-800 text-sm lg:text-base leading-relaxed">{msg.text}</p>
-
-                {/* Source Documents Display (Innovation 1) */}
-                {msg.type === "ai" && msg.sources && msg.sources.length > 0 && (
-                  <div className="mt-2 text-xs text-gray-600 border-t border-gray-200 pt-2">
-                    Source(s): Page(s) {getUniquePageNumbers(msg.sources).join(', ')}
-                  </div>
-                )}
-
-                {/* User Feedback Controls (Innovation 2) */}
-                {msg.type === "ai" && (
-                    <div className="mt-3 flex space-x-2 justify-end"> {/* Align feedback to the right */}
-                        <button
-                            onClick={() => handleFeedback(msg.id, 'positive')}
-                            disabled={msg.feedbackGiven} // Disable after feedback
-                            className={`p-1 rounded-full ${msg.feedbackGiven ? 'text-gray-400 cursor-not-allowed' : 'text-green-600 hover:bg-green-100'}`}
-                            title="Helpful"
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6.382 11.023A1.35 1.35 0 017 11c.884 0 1.57-.44 1.948-1.045l.003-.004L9.9 8.2A1 1 0 0110 8c.417 0 .806.285.992.676.664 1.408 2.054 1.957 3.522 1.957h1.082c.086 0 .17-.01.25-.024a1.688 1.688 0 001.26-1.743l-.707-10.597A1.5 1.5 0 0015.177 3H15V2.25A2.25 2.25 0 0012.75 0h-2.25a.75.75 0 00-.75.75v3.5a.75.75 0 00.75.75H12a.75.75 0 01.75.75v1.5a.75.75 0 01-.75.75h-.75V7.5a.75.75 0 00-.75-.75h-.75a.75.75 0 00-.75.75v.75H6.382zM4.5 18h11a1.5 1.5 0 001.5-1.5v-9a1.5 1.5 0 00-1.5-1.5h-11A1.5 1.5 0 003 7.5v9A1.5 1.5 0 004.5 18z" clipRule="evenodd" />
-                            </svg>
-                        </button>
-                        <button
-                            onClick={() => handleFeedback(msg.id, 'negative')}
-                            disabled={msg.feedbackGiven} // Disable after feedback
-                            className={`p-1 rounded-full ${msg.feedbackGiven ? 'text-gray-400 cursor-not-allowed' : 'text-red-600 hover:bg-red-100'}`}
-                            title="Not Helpful"
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 rotate-180" viewBox="0 0 20 20" fill="currentColor">
-                                <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6.382 11.023A1.35 1.35 0 017 11c.884 0 1.57-.44 1.948-1.045l.003-.004L9.9 8.2A1 1 0 0110 8c.417 0 .806.285.992.676.664 1.408 2.054 1.957 3.522 1.957h1.082c.086 0 .17-.01.25-.024a1.688 1.688 0 001.26-1.743l-.707-10.597A1.5 1.5 0 0015.177 3H15V2.25A2.25 2.25 0 0012.75 0h-2.25a.75.75 0 00-.75.75v3.5a.75.75 0 00.75.75H12a.75.75 0 01.75.75v1.5a.75.75 0 01-.75.75h-.75V7.5a.75.75 0 00-.75-.75h-.75a.75.75 0 00-.75.75v.75H6.382zM4.5 18h11a1.5 1.5 0 001.5-1.5v-9a1.5 1.5 0 00-1.5-1.5h-11A1.5 1.5 0 003 7.5v9A1.5 1.5 0 004.5 18z" clipRule="evenodd" />
-                            </svg>
-                        </button>
-                    </div>
-                )}
-              </div>
-            </div>
-          ))}
-
-          {loading && (
-            <div className="flex items-center justify-center py-4">
-              <div className="text-gray-500 text-sm lg:text-base">Thinking...</div>
-            </div>
-          )}
-
-          {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3 lg:p-4 text-red-700 text-sm lg:text-base">
-              {error}
-            </div>
-          )}
-
-          {uploadMessage && (
-            <div className="bg-green-50 border border-green-200 rounded-lg p-3 lg:p-4 text-green-700 text-sm lg:text-base">
-              {uploadMessage}
-            </div>
-          )}
-          <div ref={chatEndRef} /> {/* For auto-scrolling */}
-        </div>
+         <ChatArea
+        conversation={conversation}
+        loading={loading}
+        error={error}
+        uploadMessage={uploadMessage}
+        getUniquePageNumbers={getUniquePageNumbers}
+        handleFeedback={handleFeedback}
+      />
 
         {/* Message Input */}
-        <div className="px-6 lg:px-8 py-4 lg:py-6 border-t border-gray-100">
-          <div className="flex items-center space-x-3 lg:space-x-4">
-            <div className="flex-1 relative">
-              <textarea
-                value={question}
-                onChange={handleQuestionChange}
-                onKeyPress={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault()
-                    handleAskQuestion()
-                  }
-                }}
-                placeholder="Send a message..."
-                disabled={loading || !documentId}
-                className="w-full px-4 lg:px-6 py-3 lg:py-4 pr-12 bg-gray-50 border border-gray-200 rounded-2xl resize-none focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm lg:text-base placeholder-gray-500 disabled:bg-gray-100"
-                rows="1"
-                style={{ minHeight: "48px", maxHeight: "120px" }}
-              />
-            </div>
-
-            <button
-              onClick={handleAskQuestion}
-              disabled={loading || !documentId || !question.trim()}
-              className="w-12 h-12 lg:w-14 lg:h-14 bg-black rounded-xl flex items-center justify-center hover:bg-gray-800 transition-colors disabled:bg-gray-300"
-            >
-              <svg className="w-5 h-5 lg:w-6 lg:h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
-                />
-              </svg>
-            </button>
-          </div>
-        </div>
+        <MessageInput
+        question={question}
+        onChange={handleQuestionChange}
+        onSend={handleAskQuestion}
+        loading={loading}
+        documentId={documentId}
+      />
 
         {/* Duplicate File Modal */}
-        {showDuplicateModal && duplicateFileData && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-            <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md animate-fade-in">
-              <h3 className="text-xl font-bold text-gray-800 mb-2 text-center">Duplicate File Detected!</h3>
-              <p className="text-gray-600 text-center mb-6">
-                A file named <span className="font-semibold text-black">"{duplicateFileData.filename}"</span> already exists.<br />
-                What would you like to do?
-              </p>
-              <div className="flex flex-col space-y-3">
-                <button
-                  onClick={() => handleDuplicateAction('overwrite')}
-                  disabled={loading}
-                  className="w-full py-2 rounded-lg bg-green-600 text-white font-semibold hover:bg-green-700 transition disabled:bg-gray-300"
-                >
-                  {loading ? 'Overwriting...' : 'Overwrite Existing'}
-                </button>
-                <button
-                  onClick={() => handleDuplicateAction('new')}
-                  disabled={loading}
-                  className="w-full py-2 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition disabled:bg-gray-300"
-                >
-                  {loading ? 'Uploading New...' : 'Upload as New File'}
-                </button>
-                <button
-                  onClick={() => handleDuplicateAction('cancel')}
-                  disabled={loading}
-                  className="w-full py-2 rounded-lg bg-gray-200 text-gray-700 font-semibold hover:bg-gray-300 transition disabled:bg-gray-100"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+       <DuplicateFileModal
+        show={showDuplicateModal}
+        data={duplicateFileData}
+        loading={loading}
+        onAction={handleDuplicateAction}
+      />
       </div>
     </div>
   )
