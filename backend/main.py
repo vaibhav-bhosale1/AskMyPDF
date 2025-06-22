@@ -5,9 +5,10 @@ from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Form
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import NoResultFound
 from sqlalchemy.exc import IntegrityError
 import fitz
-from . import database
+from . import database # Keep this if database.py is structured to be imported this way
 from dotenv import load_dotenv
 from werkzeug.utils import secure_filename
 import shutil
@@ -21,7 +22,7 @@ from langchain_core.documents import Document
 from . import nlp_utils
 from . import models
 from . import schemas
-from .database import engine, Base, get_db
+from .database import engine, Base, get_db # Ensure engine, Base, get_db are imported
 
 load_dotenv()
 
@@ -34,8 +35,11 @@ os.makedirs(TEXT_DIR, exist_ok=True)
 os.makedirs(CHROMA_DB_DIR, exist_ok=True)
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__) 
 
-Base.metadata.create_all(bind=engine)
+# --- REMOVE THIS LINE ---
+# Base.metadata.create_all(bind=engine) # <--- REMOVE THIS LINE!
+
 
 app = FastAPI()
 
@@ -51,6 +55,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# --- ADD THIS BLOCK BACK / ENSURE IT'S UNCOMMENTED AND CORRECT ---
+@app.on_event("startup")
+def on_startup():
+    logger.info("FastAPI startup event triggered. Creating/checking database tables...")
+    Base.metadata.create_all(bind=engine)
+    logger.info("Database tables created/checked.")
+# --- END OF ADDED/MODIFIED BLOCK ---
+
 
 def generate_unique_filename(original_filename: str, db: Session) -> str:
     name, ext = os.path.splitext(original_filename)
@@ -215,13 +228,19 @@ async def upload_pdf(
         logging.error(f"Error processing file {filename_to_use}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Could not process file: {e}")
 
+@app.get("/documents/", response_model=List[schemas.DocumentResponse])
+async def get_documents(db: Session = Depends(get_db)):
+    documents = db.query(models.Document).all()
+    return [schemas.DocumentResponse(document_id=doc.id, filename=doc.filename, message="Loaded") for doc in documents]
+
+
 @app.post("/ask-question/{document_id}", response_model=schemas.QuestionResponse)
 async def ask_question(
-    document_id: int, # document_id from URL path
-    request: schemas.QuestionRequest, # question from request body
-    db: Session = Depends(get_db) # get_db is directly imported, no need for database.get_db
+    document_id: int,
+    request: schemas.QuestionRequest,
+    db: Session = Depends(get_db)
 ):
-    question = request.question # Get question from the request body
+    question = request.question
 
     logging.info(f"Received question for document ID {document_id}: '{question}'")
 
@@ -231,33 +250,26 @@ async def ask_question(
         raise HTTPException(status_code=404, detail=f"Document with ID {document_id} not found.")
 
     try:
-        qa_chain = nlp_utils.get_qa_chain(document_id) # Call nlp_utils.get_qa_chain
+        qa_chain = nlp_utils.get_qa_chain(document_id)
         if qa_chain is None:
-            # get_qa_chain will log the specific reason if it returns None
             raise HTTPException(status_code=500, detail="Could not load QA system for the document. Please ensure the PDF was processed correctly.")
 
         logging.info(f"Invoking QA chain with question: {request.question}")
-        response = qa_chain.invoke({"query": request.question, "chat_history": []}) # Ensure 'query' key is used here
+        response = qa_chain.invoke({"query": request.question, "chat_history": []})
 
-        # --- MODIFICATION START ---
-        # Log the raw result from the QA chain for debugging
         logging.info(f"Raw QA Chain Result: {response}")
 
-        # RetrievalQA chain returns the answer in the 'result' key, not 'answer'
         answer = response.get("result", "No answer found.")
         source_documents_raw = response.get("source_documents", [])
 
-        # Log the content of retrieved source documents
         if source_documents_raw:
             for i, doc in enumerate(source_documents_raw):
-                logging.info(f"Retrieved Source Document {i+1} (Page {doc.metadata.get('page')}, Filename: {doc.metadata.get('filename')}): {doc.page_content[:500]}...") # Log first 500 chars
+                logging.info(f"Retrieved Source Document {i+1} (Page {doc.metadata.get('page')}, Filename: {doc.metadata.get('filename')}): {doc.page_content[:500]}...")
         else:
             logging.info("No source documents retrieved by the QA chain.")
-        # --- MODIFICATION END ---
 
         source_documents_formatted = []
         for doc in source_documents_raw:
-            # Extract only necessary metadata for client, like 'page'
             formatted_metadata = {k: v for k, v in doc.metadata.items() if k in ['page']}
             source_documents_formatted.append(
                 schemas.SourceDocument(
@@ -267,48 +279,49 @@ async def ask_question(
             )
 
         logging.info(f"Answer generated for document ID {document_id}: '{answer[:50]}...'")
-        # Log pages of source documents if available
         logging.info(f"Source documents found from pages: {[doc.metadata.get('page') for doc in source_documents_raw if doc.metadata.get('page')]}")
 
-        # Return the response conforming to schemas.QuestionResponse
         return schemas.QuestionResponse(
             answer=answer,
-            document_id=document_id, # Include document_id
-            question=question,        # Include question
+            document_id=document_id,
+            question=question,
             sources=source_documents_formatted
         )
     except HTTPException as http_exc:
-        raise http_exc # Re-raise FastAPI HTTPExceptions directly
+        raise http_exc
     except Exception as e:
         logging.error(f"Error answering question for document ID {document_id}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error processing question: {e}.")
 
-# --- NEW /submit-feedback endpoint ---
-@app.post("/submit-feedback/", response_model=schemas.FeedbackResponse)
-async def submit_feedback(feedback_data: schemas.FeedbackRequest, db: Session = Depends(get_db)):
-    logging.info(f"Received feedback for document ID {feedback_data.document_id}: Type={feedback_data.feedback_type}")
+@app.post("/submit-feedback/", status_code=200)
+async def submit_feedback(feedback_request: schemas.FeedbackRequest, db: Session = Depends(get_db)):
+    logger.info(f"Received feedback for document ID {feedback_request.document_id}, type: {feedback_request.feedback_type}")
 
-    doc_exists = db.query(models.Document).filter(models.Document.id == feedback_data.document_id).first()
-    if not doc_exists:
-        raise HTTPException(status_code=404, detail="Document not found for feedback submission.")
+    db_document = db.query(models.Document).filter(models.Document.id == feedback_request.document_id).first()
+    if not db_document:
+        logger.warning(f"Attempted to submit feedback for non-existent document ID: {feedback_request.document_id}")
+        raise HTTPException(status_code=404, detail=f"Document with ID {feedback_request.document_id} not found.")
 
-    new_feedback = models.Feedback(
-        document_id=feedback_data.document_id,
-        question=feedback_data.question,
-        answer=feedback_data.answer,
-        feedback_type=feedback_data.feedback_type,
-    )
-    db.add(new_feedback)
-    db.commit()
-    db.refresh(new_feedback)
-    logging.info(f"Feedback ID {new_feedback.id} recorded for document ID {feedback_data.document_id}")
-
-    return schemas.FeedbackResponse(
-        id=new_feedback.id,
-        document_id=new_feedback.document_id,
-        question=new_feedback.question,
-        answer=new_feedback.answer,
-        feedback_type=new_feedback.feedback_type,
-        submitted_at=new_feedback.submitted_at,
-        message="Feedback submitted successfully."
-    )
+    try:
+        db_feedback = models.Feedback(
+            document_id=feedback_request.document_id,
+            question=feedback_request.question,
+            answer=feedback_request.answer,
+            feedback_type=feedback_request.feedback_type
+        )
+        db.add(db_feedback)
+        db.commit()
+        db.refresh(db_feedback)
+        logger.info(f"Feedback submitted successfully for document ID {feedback_request.document_id}, Feedback ID: {db_feedback.id}")
+        return {"message": "Feedback submitted successfully."}
+    except IntegrityError as e:
+        db.rollback()
+        logger.error(f"IntegrityError submitting feedback for document ID {feedback_request.document_id}: {e}", exc_info=True)
+        if "FOREIGN KEY constraint failed" in str(e) or "REFERENCES" in str(e):
+            raise HTTPException(status_code=400, detail="Invalid document ID or related data.")
+        else:
+            raise HTTPException(status_code=409, detail="A conflict occurred while submitting feedback. It might be a duplicate entry or invalid data.")
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error submitting feedback for document ID {feedback_request.document_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {e}")
