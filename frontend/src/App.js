@@ -91,57 +91,55 @@ function App() {
     setQuestion(event.target.value)
   }
 
-  const handleAskQuestion = async () => {
+ const handleAskQuestion = async () => {
     if (!documentId) {
-      setError("Please upload a PDF first and get a Document ID.")
-      return
-    }
-    if (!question.trim()) {
-      setError("Please enter a question.")
-      return
-    }
+      setError("Please upload a PDF first and get a Document ID.")
+      return
+    }
+    if (!question.trim()) {
+      setError("Please enter a question.")
+      return
+    }
 
-    const userQuestion = question.trim()
-    // Assign a unique ID to each message for feedback tracking
-    const messageId = Date.now()
-    setConversation((prev) => [...prev, { type: "user", text: userQuestion, id: messageId }])
-    setQuestion("")
-    setLoading(true)
-    setError("")
+    const userQuestion = question.trim()
+    const messageId = Date.now()
+    setConversation((prev) => [...prev, { type: "user", text: userQuestion, id: messageId }])
+    setQuestion("")
+    setLoading(true)
+    setError("")
 
-    try {
-      const response = await fetch(`${API_BASE_URL}/ask-question/`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ document_id: documentId, question: userQuestion }),
-      })
+    try {
+      const response = await fetch(`${API_BASE_URL}/ask-question/${documentId}`, { // <-- MODIFIED LINE HERE
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ question: userQuestion }), // <-- MODIFIED LINE HERE
+      })
 
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.detail || "Failed to get answer.")
-      }
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.detail || "Failed to get answer.")
+      }
 
-      const data = await response.json()
-      // Store the AI message along with its sources
-      setConversation((prev) => [
-        ...prev,
-        {
-          type: "ai",
-          text: data.answer,
-          id: messageId + 1, // Another unique ID for AI response
-          sources: data.source_documents || [], // Store source documents
-          feedbackGiven: false // Initial state for feedback
-        },
-      ])
-    } catch (err) {
-      setError(`Question Error: ${err.message}`)
-      setConversation((prev) => [...prev, { type: "ai", text: `Error: ${err.message}`, id: Date.now() }])
-    } finally {
-      setLoading(false)
-    }
-  }
+      const data = await response.json()
+      setConversation((prev) => [
+        ...prev,
+        {
+          type: "ai",
+          text: data.answer,
+          id: messageId + 1,
+          sources: data.source_documents || [],
+          feedbackGiven: false
+        },
+      ])
+    } catch (err) {
+      setError(`Question Error: ${err.message}`)
+      setConversation((prev) => [...prev, { type: "ai", text: `Error: ${err.message}`, id: Date.now() }])
+    } finally {
+      setLoading(false)
+    }
+  }
 
   // New function to handle feedback submission
   const handleFeedback = async (messageId, feedbackType) => {
@@ -428,20 +426,35 @@ function App() {
 
         {/* Duplicate File Modal */}
         {showDuplicateModal && duplicateFileData && (
-          <div className="modal-overlay">
-            <div className="modal-content">
-              <h3>Duplicate File Detected!</h3>
-              <p>
-                A file named "<strong>{duplicateFileData.filename}</strong>" already exists. What would you like to do?
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+            <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md animate-fade-in">
+              <h3 className="text-xl font-bold text-gray-800 mb-2 text-center">Duplicate File Detected!</h3>
+              <p className="text-gray-600 text-center mb-6">
+                A file named <span className="font-semibold text-black">"{duplicateFileData.filename}"</span> already exists.<br />
+                What would you like to do?
               </p>
-              <div className="modal-actions">
-                <button onClick={() => handleDuplicateAction('overwrite')} disabled={loading}>
+              <div className="flex flex-col space-y-3">
+                <button
+                  onClick={() => handleDuplicateAction('overwrite')}
+                  disabled={loading}
+                  className="w-full py-2 rounded-lg bg-green-600 text-white font-semibold hover:bg-green-700 transition disabled:bg-gray-300"
+                >
                   {loading ? 'Overwriting...' : 'Overwrite Existing'}
                 </button>
-                <button onClick={() => handleDuplicateAction('new')} disabled={loading}>
+                <button
+                  onClick={() => handleDuplicateAction('new')}
+                  disabled={loading}
+                  className="w-full py-2 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition disabled:bg-gray-300"
+                >
                   {loading ? 'Uploading New...' : 'Upload as New File'}
                 </button>
-                <button onClick={() => handleDuplicateAction('cancel')} disabled={loading}>Cancel</button>
+                <button
+                  onClick={() => handleDuplicateAction('cancel')}
+                  disabled={loading}
+                  className="w-full py-2 rounded-lg bg-gray-200 text-gray-700 font-semibold hover:bg-gray-300 transition disabled:bg-gray-100"
+                >
+                  Cancel
+                </button>
               </div>
             </div>
           </div>
