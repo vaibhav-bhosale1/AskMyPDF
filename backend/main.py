@@ -7,10 +7,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 import fitz
+from . import database
 from dotenv import load_dotenv
 from werkzeug.utils import secure_filename
 import shutil
 import os
+from typing import List, Dict, Any 
 from datetime import datetime
 from typing import Optional
 
@@ -213,10 +215,11 @@ async def upload_pdf(
         logging.error(f"Error processing file {filename_to_use}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Could not process file: {e}")
 
-@app.post("/ask-question/", response_model=schemas.AnswerResponse)
+@app.post("/ask-question/", response_model=schemas.QuestionResponse)
 async def ask_question(
+    document_id: int,
     request: schemas.QuestionRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(database.get_db)
 ):
     document_id = request.document_id
     question = request.question
