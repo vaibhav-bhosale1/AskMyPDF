@@ -1,0 +1,244 @@
+/* frontend/src/App.css */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap'); /* Using Inter font as commonly seen in modern UIs */
+
+body {
+  margin: 0;
+  font-family: 'Inter', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #f7f9fc; /* Light background */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+}
+
+.app-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 900px; /* Adjust based on Figma width */
+  height: 90vh; /* Adjust height for the chat window */
+  background-color: #fff;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+
+/* Header Styling */
+.app-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 25px;
+  border-bottom: 1px solid #e0e0e0;
+  background-color: #ffffff;
+}
+
+.logo-section {
+  display: flex;
+  align-items: center;
+}
+
+.logo {
+  height: 35px; /* Adjust logo size */
+  margin-right: 10px;
+}
+
+.document-section {
+  display: flex;
+  align-items: center;
+  gap: 15px; /* Space between elements */
+}
+
+.document-name-label {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  background-color: #f7f9fc;
+  cursor: pointer; /* To indicate it's clickable for file input */
+  font-size: 14px;
+  color: #333;
+}
+
+.pdf-icon {
+  font-size: 18px;
+  margin-right: 8px;
+  color: #ff4500; /* Example color for PDF icon */
+}
+
+.upload-btn {
+  background-color: #6a1b9a; /* Deep purple */
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 18px;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transition: background-color 0.2s ease;
+}
+
+.upload-btn:hover:not(:disabled) {
+  background-color: #5a148a; /* Darker purple on hover */
+}
+
+.upload-btn:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+}
+
+.plus-icon {
+  font-weight: bold;
+  font-size: 18px;
+}
+
+
+/* Chat Window Styling */
+.chat-window {
+  flex-grow: 1; /* Takes available space */
+  padding: 20px 25px;
+  overflow-y: auto; /* Scrollable chat history */
+  background-color: #fcfdff; /* Slightly different background for chat area */
+}
+
+.welcome-message {
+  text-align: center;
+  color: #666;
+  margin-top: 50px;
+}
+
+.message-bubble {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: 15px;
+}
+
+.message-bubble.user {
+  justify-content: flex-start; /* User message on left */
+}
+
+.message-bubble.ai {
+  justify-content: flex-start; /* AI message on left */
+}
+
+.avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-weight: bold;
+  font-size: 14px;
+  color: white;
+  flex-shrink: 0; /* Prevent avatar from shrinking */
+  margin-right: 10px;
+}
+
+.message-bubble.user .avatar {
+  background-color: #6a1b9a; /* Purple from Figma */
+}
+
+.message-bubble.ai .avatar {
+  background-color: #1a73e8; /* Blue for AI, or a suitable AI Planet green/blue */
+}
+
+.message-content {
+  background-color: #f1f3f4; /* Light grey bubble */
+  padding: 12px 18px;
+  border-radius: 20px;
+  max-width: 80%; /* Limit bubble width */
+  word-wrap: break-word;
+  font-size: 15px;
+  line-height: 1.5;
+  color: #333;
+  text-align: left; /* Ensure text within bubble is left-aligned */
+}
+
+/* Loading and Error messages */
+.loading-indicator, .success-message, .error-message {
+  text-align: center;
+  padding: 10px;
+  margin-top: 10px;
+  border-radius: 5px;
+  font-size: 14px;
+}
+
+.loading-indicator {
+  color: #007bff;
+}
+
+.error-message {
+  color: #d9534f;
+  background-color: #f9dcdc;
+  border: 1px solid #d9534f;
+}
+
+.success-message {
+  color: #28a745;
+  background-color: #d4edda;
+  border: 1px solid #28a745;
+}
+
+/* Message Input Styling */
+.message-input-container {
+  display: flex;
+  padding: 15px 25px;
+  border-top: 1px solid #e0e0e0;
+  background-color: #ffffff;
+  align-items: center;
+  gap: 10px;
+}
+
+.message-input-container textarea {
+  flex-grow: 1; /* Takes most of the space */
+  border: 1px solid #e0e0e0;
+  border-radius: 25px; /* Rounded corners */
+  padding: 12px 18px;
+  font-size: 15px;
+  resize: none; /* Disable manual resize */
+  min-height: 45px; /* Minimum height */
+  max-height: 150px; /* Max height before scroll */
+  overflow-y: auto; /* Enable scroll if content exceeds max-height */
+  line-height: 1.5;
+}
+
+.message-input-container textarea:focus {
+  outline: none;
+  border-color: #6a1b9a;
+  box-shadow: 0 0 0 2px rgba(106, 27, 154, 0.2);
+}
+
+.message-input-container button {
+  background-color: #6a1b9a;
+  color: white;
+  border: none;
+  border-radius: 50%; /* Circular button */
+  width: 45px;
+  height: 45px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  flex-shrink: 0; /* Prevent button from shrinking */
+}
+
+.message-input-container button:hover:not(:disabled) {
+  background-color: #5a148a;
+}
+
+.message-input-container button:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+}
+
+.send-icon {
+  font-size: 18px;
+}
