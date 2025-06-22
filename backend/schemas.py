@@ -1,7 +1,8 @@
 # backend/schemas.py
-from pydantic import BaseModel
+
 from datetime import datetime
-from typing import List, Dict, Any, Optional
+from pydantic import BaseModel
+from typing import List, Optional
 
 class DocumentResponse(BaseModel):
     id: int
@@ -9,25 +10,19 @@ class DocumentResponse(BaseModel):
     uploaded_at: datetime
     message: str
 
+    class Config:
+        from_attributes = True
+
 class QuestionRequest(BaseModel):
-    document_id: int
     question: str
 
-# New Pydantic model for source documents
-class SourceDocument(BaseModel):
-    page_content: str
-    metadata: Dict[str, Any] # This will contain 'page' number
-
-class AnswerResponse(BaseModel):
+class QuestionResponse(BaseModel):
     answer: str
-    document_id: int
-    question: str
-    # Add source_documents to the response
-    source_documents: Optional[List[SourceDocument]] = None # Use Optional as it might be empty or null
+    sources: List[dict] # To provide snippet and page number
 
-# New Pydantic model for feedback request
-class FeedbackRequest(BaseModel):
-    document_id: int
-    question: str
-    answer: str
-    feedback_type: bool # True for positive, False for negative
+# --- NEW SCHEMA FOR DUPLICATE FILE HANDLING ---
+class DuplicateFileResponse(BaseModel):
+    message: str = "File with this name already exists."
+    existing_document_id: int
+    filename: str
+    action_required: bool = True # Indicates frontend needs to prompt user
