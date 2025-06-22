@@ -9,7 +9,8 @@ const API_BASE_URL = "http://127.0.0.1:8000"
 function App() {
   const [selectedFile, setSelectedFile] = useState(null)
   const [uploadMessage, setUploadMessage] = useState("")
-  const [documentId, setDocumentId] = useState(null)
+  const [documentId, setDocumentId] = useState(null) // documentId is null initially
+
   const [documentName, setDocumentName] = useState("upload your pdf here")
   const [question, setQuestion] = useState("")
   // Update conversation state to include source_documents for AI messages
@@ -74,7 +75,7 @@ function App() {
 
       const data = await response.json();
       alert(`File uploaded! Document ID: ${data.id}`);
-      setDocumentId(data.id);
+      setDocumentId(data.id); // This sets the documentId state
       setDocumentName(data.filename);
       setUploadMessage(data.message || "PDF uploaded and processed!");
       if (data.message) {
@@ -83,7 +84,7 @@ function App() {
 
     } catch (err) {
       setError(`Upload Error: ${err.message}`)
-      setDocumentId(null)
+      setDocumentId(null) // Resets documentId on error
     } finally {
       setLoading(false)
     }
@@ -93,58 +94,58 @@ function App() {
     setQuestion(event.target.value)
   }
 
- const handleAskQuestion = async () => {
-    if (!documentId) {
-      setError("Please upload a PDF first and get a Document ID.")
-      return
-    }
-    if (!question.trim()) {
-      setError("Please enter a question.")
-      return
-    }
+  const handleAskQuestion = async () => {
+    if (!documentId) { // This condition ensures documentId is set before asking
+      setError("Please upload a PDF first and get a Document ID.")
+      return
+    }
+    if (!question.trim()) {
+      setError("Please enter a question.")
+      return
+    }
 
-    const userQuestion = question.trim()
-    const messageId = Date.now()
-    setConversation((prev) => [...prev, { type: "user", text: userQuestion, id: messageId }])
-    setQuestion("")
-    setLoading(true)
-    setError("")
+    const userQuestion = question.trim()
+    const messageId = Date.now()
+    setConversation((prev) => [...prev, { type: "user", text: userQuestion, id: messageId }])
+    setQuestion("")
+    setLoading(true)
+    setError("")
 
-    try {
-      const response = await fetch(`${API_BASE_URL}/ask-question/${documentId}`, { // <-- MODIFIED LINE HERE
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ question: userQuestion }), // <-- MODIFIED LINE HERE
-      })
+    try {
+      const response = await fetch(`${API_BASE_URL}/ask-question/${documentId}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ question: userQuestion }),
+      })
 
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.detail || "Failed to get answer.")
-      }
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.detail || "Failed to get answer.")
+      }
 
-      const data = await response.json()
-      setConversation((prev) => [
-        ...prev,
-        {
-          type: "ai",
-          text: data.answer,
-          id: messageId + 1,
-          sources: data.source_documents || [],
-          feedbackGiven: false
-        },
-      ])
-    } catch (err) {
-      setError(`Question Error: ${err.message}`)
-      setConversation((prev) => [...prev, { type: "ai", text: `Error: ${err.message}`, id: Date.now() }])
-    } finally {
-      setLoading(false)
-    }
-  }
+      const data = await response.json()
+      setConversation((prev) => [
+        ...prev,
+        {
+          type: "ai",
+          text: data.answer,
+          id: messageId + 1,
+          sources: data.source_documents || [],
+          feedbackGiven: false
+        },
+      ])
+    } catch (err) {
+      setError(`Question Error: ${err.message}`)
+      setConversation((prev) => [...prev, { type: "ai", text: `Error: ${err.message}`, id: Date.now() }])
+    } finally {
+      setLoading(false)
+    }
+  }
 
   // New function to handle feedback submission
-   const handleFeedback = async (messageId, feedbackType) => {
+  const handleFeedback = async (messageId, feedbackType) => {
     // Prevent submitting feedback multiple times for the same message
     const messageIndex = conversation.findIndex(msg => msg.id === messageId);
     if (messageIndex === -1 || conversation[messageIndex].feedbackGiven) {
@@ -253,7 +254,7 @@ function App() {
         body: formData,
       });
       const data = await response.json();
-      setDocumentId(data.id);
+      setDocumentId(data.id); // This sets the documentId state
       setDocumentName(data.filename);
       setUploadMessage(data.message || "PDF uploaded and processed!");
       if (data.message) {
@@ -261,7 +262,7 @@ function App() {
       }
     } catch (err) {
       setError(`Upload Error: ${err.message}`);
-      setDocumentId(null);
+      setDocumentId(null); // Resets documentId on error
     } finally {
       setLoading(false);
     }
@@ -315,7 +316,7 @@ function App() {
         </div>
 
         {/* Chat Area */}
-         <ChatArea
+          <ChatArea
         conversation={conversation}
         loading={loading}
         error={error}
@@ -330,7 +331,7 @@ function App() {
         onChange={handleQuestionChange}
         onSend={handleAskQuestion}
         loading={loading}
-        documentId={documentId}
+        documentId={documentId} // documentId is passed here
       />
 
         {/* Duplicate File Modal */}
