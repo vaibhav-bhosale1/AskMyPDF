@@ -1,3 +1,5 @@
+# backend/main.py
+
 import logging
 from fastapi import FastAPI, UploadFile, File, HTTPException, Depends
 from typing import Annotated
@@ -5,6 +7,8 @@ import shutil
 from fastapi.middleware.cors import CORSMiddleware
 import os
 import fitz
+# CONFIRM THIS IMPORT LINE: It should correctly import get_qa_chain
+from .nlp_utils import process_text_and_create_vector_store, get_qa_chain
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
@@ -13,7 +17,10 @@ from . import models, schemas
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-models.Base.metadata.create_all(bind=engine)
+# IMPORTANT: Uncomment this line to create your database tables if they don't exist.
+# You only need to run this once when setting up your database for the first time.
+#models.Base.metadata.create_all(bind=engine) # Make sure this line is active if your tables aren't created yet
+
 
 app = FastAPI()
 origins = [
@@ -134,8 +141,9 @@ async def ask_question(
         raise HTTPException(status_code=404, detail=f"Document with ID {document_id} not found.")
 
     try:
+        # CONFIRM THIS CALL: It should use get_qa_chain and then invoke it
         qa_chain = get_qa_chain(document_id)
-        result = qa_chain.invoke({"query": question})
+        result = qa_chain.invoke({"query": question}) # Pass question to the chain's invoke method
 
         answer = result.get("result", "Could not find an answer.")
         logging.info(f"Answer generated for document ID {document_id}: '{answer[:50]}...'")
@@ -147,5 +155,4 @@ async def ask_question(
         }
     except Exception as e:
         logging.error(f"Error answering question for document ID {document_id}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Error processing question: {e}. "
-                                                     "Ensure the document was processed correctly and Ollama is running.")
+        raise HTTPException(status_code=500, detail=f"Error processing question: {e}.")

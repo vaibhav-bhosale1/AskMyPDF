@@ -24,7 +24,7 @@ function App() {
     }
   }
 
-  const handleUpload = async () => {
+const handleUpload = async () => {
     if (!selectedFile) {
       setUploadMessage("Please select a file first!")
       return
@@ -46,21 +46,38 @@ function App() {
 
       if (!response.ok) {
         const errorData = await response.json()
-        throw new Error(errorData.detail || "File upload failed.")
+        // If the backend returns a 409 Conflict for duplicate file, extract the ID
+        if (response.status === 409 && errorData.id) {
+          alert(errorData.message); // Show the duplicate message
+          setDocumentId(errorData.id); // Set document ID from the existing one
+          setDocumentName(errorData.filename); // Set document name from the existing one
+          setUploadMessage(errorData.message); // Display message in UI
+          return; // Exit here as it's a "successful" handling of a duplicate
+        }
+        throw new Error(errorData.detail || "File upload failed.");
       }
 
-      const data = await response.json()
-      setUploadMessage(`File uploaded! Document ID: ${data.id}`)
-      setDocumentId(data.id)
+      const data = await response.json();
+      alert(`File uploaded! Document ID: ${data.id}`);
+      // FIX IS HERE: Set the documentId from the response data
+      setDocumentId(data.id);
+      setDocumentName(data.filename); // Update document name with the actual uploaded/existing filename
+      setUploadMessage(data.message || "PDF uploaded and processed!"); // Display success message
+       if (data.message) {
+      setTimeout(() => setUploadMessage(""), 3000);
+    }
+      
     } catch (err) {
       setError(`Upload Error: ${err.message}`)
-      setDocumentId(null)
-      setDocumentName("demo.pdf")
+      setDocumentId(null) // Ensure it's null on actual upload failure
+      // Keep selectedFile.name if you want to retry the same file,
+      // or set to default if you want to clear it completely.
+      // For now, let's keep it to allow re-selection or showing the problem.
+      // setDocumentName("upload your pdf here"); // Removed: Better to keep the selected file name on error
     } finally {
       setLoading(false)
     }
   }
-
   const handleQuestionChange = (event) => {
     setQuestion(event.target.value)
   }
@@ -154,10 +171,21 @@ function App() {
 
         {/* Chat Area */}
         <div className="flex-1 overflow-y-auto px-6 lg:px-8 py-4 lg:py-6 space-y-4 lg:space-y-6">
-          {conversation.length === 0 && !loading && !error && (
+          {/* Show when no PDF uploaded */}
+          {!documentId && conversation.length === 0 && !loading && !error && (
             <div className="text-center text-gray-500 mt-8">
-              <p className="text-sm lg:text-base">Upload a PDF and start asking questions!</p>
-             
+              <p className="text-sm lg:text-base">
+                Upload a PDF and start asking questions!
+              </p>
+            </div>
+          )}
+
+          {/* Show when PDF uploaded, but no questions yet */}
+          {documentId && conversation.length === 0 && !loading && !error && (
+            <div className="text-center text-green-600 mt-8">
+              <p className="text-sm lg:text-base">
+                Now you can ask questions about your PDF!
+              </p>
             </div>
           )}
 
