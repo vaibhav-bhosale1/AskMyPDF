@@ -16,6 +16,10 @@ function App() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
 
+  // New state variables for handling duplicate files
+  const [showDuplicateModal, setShowDuplicateModal] = useState(false);
+  const [duplicateFileData, setDuplicateFileData] = useState(null);
+
   // Ref for auto-scrolling chat
   const chatEndRef = useRef(null)
 
@@ -56,12 +60,11 @@ function App() {
       })
 
       if (!response.ok) {
-        const errorData = await response.json()
-        if (response.status === 409 && errorData.id) {
-          alert(errorData.message);
-          setDocumentId(errorData.id);
-          setDocumentName(errorData.filename);
-          setUploadMessage(errorData.message);
+        const errorData = await response.json();
+        if (response.status === 409 && errorData.action_required) {
+          setDuplicateFileData(errorData);
+          setShowDuplicateModal(true);
+          setError("A file with this name already exists. Please choose an action.");
           return;
         }
         throw new Error(errorData.detail || "File upload failed.");
@@ -200,6 +203,51 @@ function App() {
       }
     });
     return Array.from(pages).sort((a, b) => a - b);
+  };
+
+  const handleDuplicateAction = async (action) => {
+    if (action === 'overwrite') {
+      await handleUploadWithAction('overwrite', duplicateFileData.existing_document_id);
+    } else if (action === 'new') {
+      await handleUploadWithAction('new');
+    } else {
+      setShowDuplicateModal(false);
+      setDuplicateFileData(null);
+      setSelectedFile(null);
+      setUploadMessage('Upload cancelled.');
+    }
+  };
+
+  const handleUploadWithAction = async (action, existingDocId = null) => {
+    setShowDuplicateModal(false);
+    setDuplicateFileData(null);
+    setLoading(true);
+    setError("");
+    setUploadMessage("");
+    const formData = new FormData();
+    formData.append("file", selectedFile);
+    formData.append("action", action);
+    if (existingDocId) {
+      formData.append("existing_document_id", existingDocId);
+    }
+    try {
+      const response = await fetch(`${API_BASE_URL}/upload-pdf/`, {
+        method: "POST",
+        body: formData,
+      });
+      const data = await response.json();
+      setDocumentId(data.id);
+      setDocumentName(data.filename);
+      setUploadMessage(data.message || "PDF uploaded and processed!");
+      if (data.message) {
+        setTimeout(() => setUploadMessage(""), 3000);
+      }
+    } catch (err) {
+      setError(`Upload Error: ${err.message}`);
+      setDocumentId(null);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -377,6 +425,27 @@ function App() {
             </button>
           </div>
         </div>
+
+        {/* Duplicate File Modal */}
+        {showDuplicateModal && duplicateFileData && (
+          <div className="modal-overlay">
+            <div className="modal-content">
+              <h3>Duplicate File Detected!</h3>
+              <p>
+                A file named "<strong>{duplicateFileData.filename}</strong>" already exists. What would you like to do?
+              </p>
+              <div className="modal-actions">
+                <button onClick={() => handleDuplicateAction('overwrite')} disabled={loading}>
+                  {loading ? 'Overwriting...' : 'Overwrite Existing'}
+                </button>
+                <button onClick={() => handleDuplicateAction('new')} disabled={loading}>
+                  {loading ? 'Uploading New...' : 'Upload as New File'}
+                </button>
+                <button onClick={() => handleDuplicateAction('cancel')} disabled={loading}>Cancel</button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
