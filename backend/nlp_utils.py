@@ -58,6 +58,7 @@ def get_qa_chain(document_id: int):
         logging.error(f"ChromaDB directory not found or is empty for document ID {document_id}: {persist_directory}")
         raise FileNotFoundError(f"Vector store not found for document ID {document_id}. Please ensure the PDF was processed correctly.")
 
+   
     vectorstore = Chroma(
         persist_directory=persist_directory,
         embedding_function=embeddings,
@@ -67,7 +68,7 @@ def get_qa_chain(document_id: int):
     qa_chain = RetrievalQA.from_chain_type(
         llm=llm,
         chain_type="stuff",
-        retriever=vectorstore.as_retriever(),
+        retriever=vectorstore.as_retriever(search_kwargs={"k": 4}), # <--- ADD THIS
         return_source_documents=True,
         input_key="query"
     )
