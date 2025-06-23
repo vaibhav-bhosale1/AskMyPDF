@@ -68,7 +68,7 @@ def get_qa_chain(document_id: int):
     qa_chain = RetrievalQA.from_chain_type(
         llm=llm,
         chain_type="stuff",
-        retriever=vectorstore.as_retriever(search_kwargs={"k": 4}), # <--- ADD THIS
+        retriever=vectorstore.as_retriever(search_kwargs={"k": 4}),
         return_source_documents=True,
         input_key="query"
     )

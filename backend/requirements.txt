@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+sqlalchemy
+python-dotenv
+pydantic
+PyMuPDF
+langchain
+werkzeug
+psycopg2-binary
+chromadb

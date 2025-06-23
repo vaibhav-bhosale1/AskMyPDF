@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react" // Import useEffect and useRef
+import { useState, useEffect, useRef } from "react"
 import DuplicateFileModal from "./components/DuplicateFileModal";
 import ChatArea from "./components/ChatArea";
 import MessageInput from "./components/MessageInput";
@@ -9,28 +9,19 @@ const API_BASE_URL = "http://127.0.0.1:8000"
 function App() {
   const [selectedFile, setSelectedFile] = useState(null)
   const [uploadMessage, setUploadMessage] = useState("")
-  const [documentId, setDocumentId] = useState(null) // documentId is null initially
-
+  const [documentId, setDocumentId] = useState(null)
   const [documentName, setDocumentName] = useState("upload your pdf here")
   const [question, setQuestion] = useState("")
-  // Update conversation state to include source_documents for AI messages
-  // Each message will now be: { type: "user" | "ai", text: string, id: number, sources?: Array<{ page_content: string, metadata: { page: number } }>, feedbackGiven?: boolean }
   const [conversation, setConversation] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
-
-  // New state variables for handling duplicate files
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
   const [duplicateFileData, setDuplicateFileData] = useState(null);
-
-  // Ref for auto-scrolling chat
   const chatEndRef = useRef(null)
 
-  // Auto-scroll to bottom of chat area when conversation updates
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [conversation])
-
 
   const handleFileChange = (event) => {
     const file = event.target.files[0]
@@ -51,7 +42,7 @@ function App() {
     setLoading(true)
     setError("")
     setUploadMessage("")
-    setConversation([]) // Clear conversation on new upload
+    setConversation([])
 
     const formData = new FormData()
     formData.append("file", selectedFile)
@@ -75,7 +66,7 @@ function App() {
 
       const data = await response.json();
       alert(`File uploaded! Document ID: ${data.id}`);
-      setDocumentId(data.id); // This sets the documentId state
+      setDocumentId(data.id);
       setDocumentName(data.filename);
       setUploadMessage(data.message || "PDF uploaded and processed!");
       if (data.message) {
@@ -84,7 +75,7 @@ function App() {
 
     } catch (err) {
       setError(`Upload Error: ${err.message}`)
-      setDocumentId(null) // Resets documentId on error
+      setDocumentId(null)
     } finally {
       setLoading(false)
     }
@@ -95,7 +86,7 @@ function App() {
   }
 
   const handleAskQuestion = async () => {
-    if (!documentId) { // This condition ensures documentId is set before asking
+    if (!documentId) {
       setError("Please upload a PDF first and get a Document ID.")
       return
     }
@@ -144,31 +135,24 @@ function App() {
     }
   }
 
-  // New function to handle feedback submission
   const handleFeedback = async (messageId, feedbackType) => {
-    // Prevent submitting feedback multiple times for the same message
     const messageIndex = conversation.findIndex(msg => msg.id === messageId);
     if (messageIndex === -1 || conversation[messageIndex].feedbackGiven) {
         return;
     }
 
     const aiMessage = conversation[messageIndex];
-    // Find the corresponding user question right before this AI message
-    // This logic might need to be more robust if conversation history is complex
     const userQuestionIndex = conversation.slice(0, messageIndex).reverse().findIndex(msg => msg.type === 'user');
     const userQuestion = userQuestionIndex !== -1 ? conversation[messageIndex - 1 - userQuestionIndex].text : "N/A";
 
-    // --- MODIFICATION START ---
-    // Ensure feedback_type is a string matching backend schema
     const feedbackTypeString = feedbackType === 'positive' ? 'helpful' : 'not_helpful';
 
     const feedbackPayload = {
       document_id: documentId,
       question: userQuestion,
       answer: aiMessage.text,
-      feedback_type: feedbackTypeString // <--- Use the string type here
+      feedback_type: feedbackTypeString
     };
-    // --- MODIFICATION END ---
 
     try {
       const response = await fetch(`${API_BASE_URL}/submit-feedback/`, {
@@ -180,38 +164,26 @@ function App() {
       });
 
       if (response.ok) {
-        console.log("Feedback submitted successfully.");
-        // Update the conversation state to mark this message as having feedback given
         setConversation(prev =>
             prev.map(msg =>
                 msg.id === messageId ? { ...msg, feedbackGiven: true } : msg
             )
         );
       } else {
-        // --- MODIFICATION START ---
-        // Log the full response status and text
-        console.error("Failed to submit feedback. Status:", response.status, response.statusText);
         let errorDetail = "Unknown error";
         try {
             const errorData = await response.json();
-            console.error("Failed to submit feedback. Backend error data:", errorData);
             errorDetail = errorData.detail || errorData.message || JSON.stringify(errorData);
         } catch (jsonError) {
-            console.error("Failed to parse error response as JSON:", jsonError);
-            errorDetail = response.statusText; // Fallback to status text
+            errorDetail = response.statusText;
         }
         setError(`Failed to submit feedback: ${errorDetail}`);
-        // --- MODIFICATION END ---
       }
     } catch (error) {
-      console.error("Error submitting feedback:", error);
       setError(`Error submitting feedback: ${error.message}`);
     }
   };
 
-
-
-  // Helper to extract unique page numbers for display
   const getUniquePageNumbers = (sources) => {
     if (!sources || sources.length === 0) return [];
     const pages = new Set();
@@ -254,7 +226,7 @@ function App() {
         body: formData,
       });
       const data = await response.json();
-      setDocumentId(data.id); // This sets the documentId state
+      setDocumentId(data.id);
       setDocumentName(data.filename);
       setUploadMessage(data.message || "PDF uploaded and processed!");
       if (data.message) {
@@ -262,7 +234,7 @@ function App() {
       }
     } catch (err) {
       setError(`Upload Error: ${err.message}`);
-      setDocumentId(null); // Resets documentId on error
+      setDocumentId(null);
     } finally {
       setLoading(false);
     }
@@ -271,10 +243,8 @@ function App() {
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md lg:max-w-4xl bg-white rounded-3xl shadow-xl overflow-hidden flex flex-col h-[700px] lg:h-[800px]">
-        {/* Header */}
         <div className="bg-white px-6 lg:px-8 py-4 border-b border-gray-100">
           <div className="flex items-center justify-between">
-            {/* Logo */}
             <div className="flex items-center space-x-2">
               <div className="w-8 h-8 lg:w-10 lg:h-10 bg-green-500 rounded-full flex items-center justify-center">
                 <span className="text-white font-bold text-sm lg:text-base">ai</span>
@@ -284,8 +254,6 @@ function App() {
                 <div className="text-xs lg:text-sm text-gray-500">formerly DPhi</div>
               </div>
             </div>
-
-            {/* File upload section */}
             <div className="flex items-center space-x-3">
               <input type="file" id="pdfFileInput" accept=".pdf" onChange={handleFileChange} className="hidden" />
               <label
@@ -293,7 +261,6 @@ function App() {
                 className="flex items-center space-x-2 px-3 py-2 lg:px-4 lg:py-3 bg-gray-50 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors"
               >
                 <div className="w-4 h-4 lg:w-5 lg:h-5 text-green-500">
-
                   <svg viewBox="0 0 24 24" fill="currentColor">
                     <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z" />
                   </svg>
@@ -302,7 +269,6 @@ function App() {
                   {selectedFile ? documentName : "select pdf here"}
                 </span>
               </label>
-
               <button
                 onClick={handleUpload}
                 disabled={loading}
@@ -314,33 +280,27 @@ function App() {
             </div>
           </div>
         </div>
-
-        {/* Chat Area */}
-          <ChatArea
-        conversation={conversation}
-        loading={loading}
-        error={error}
-        uploadMessage={uploadMessage}
-        getUniquePageNumbers={getUniquePageNumbers}
-        handleFeedback={handleFeedback}
-      />
-
-        {/* Message Input */}
+        <ChatArea
+          conversation={conversation}
+          loading={loading}
+          error={error}
+          uploadMessage={uploadMessage}
+          getUniquePageNumbers={getUniquePageNumbers}
+          handleFeedback={handleFeedback}
+        />
         <MessageInput
-        question={question}
-        onChange={handleQuestionChange}
-        onSend={handleAskQuestion}
-        loading={loading}
-        documentId={documentId} // documentId is passed here
-      />
-
-        {/* Duplicate File Modal */}
-       <DuplicateFileModal
-        show={showDuplicateModal}
-        data={duplicateFileData}
-        loading={loading}
-        onAction={handleDuplicateAction}
-      />
+          question={question}
+          onChange={handleQuestionChange}
+          onSend={handleAskQuestion}
+          loading={loading}
+          documentId={documentId}
+        />
+        <DuplicateFileModal
+          show={showDuplicateModal}
+          data={duplicateFileData}
+          loading={loading}
+          onAction={handleDuplicateAction}
+        />
       </div>
     </div>
   )

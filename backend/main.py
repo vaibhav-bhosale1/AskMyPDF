@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.exc import IntegrityError
 import fitz
-from . import database # Keep this if database.py is structured to be imported this way
+from . import database
 from dotenv import load_dotenv
 from werkzeug.utils import secure_filename
 import shutil
@@ -22,7 +22,7 @@ from langchain_core.documents import Document
 from . import nlp_utils
 from . import models
 from . import schemas
-from .database import engine, Base, get_db # Ensure engine, Base, get_db are imported
+from .database import engine, Base, get_db
 
 load_dotenv()
 
@@ -36,10 +36,6 @@ os.makedirs(CHROMA_DB_DIR, exist_ok=True)
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__) 
-
-# --- REMOVE THIS LINE ---
-# Base.metadata.create_all(bind=engine) # <--- REMOVE THIS LINE!
-
 
 app = FastAPI()
 
@@ -56,14 +52,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- ADD THIS BLOCK BACK / ENSURE IT'S UNCOMMENTED AND CORRECT ---
 @app.on_event("startup")
 def on_startup():
     logger.info("FastAPI startup event triggered. Creating/checking database tables...")
     Base.metadata.create_all(bind=engine)
     logger.info("Database tables created/checked.")
-# --- END OF ADDED/MODIFIED BLOCK ---
-
 
 def generate_unique_filename(original_filename: str, db: Session) -> str:
     name, ext = os.path.splitext(original_filename)
@@ -232,7 +225,6 @@ async def upload_pdf(
 async def get_documents(db: Session = Depends(get_db)):
     documents = db.query(models.Document).all()
     return [schemas.DocumentResponse(document_id=doc.id, filename=doc.filename, message="Loaded") for doc in documents]
-
 
 @app.post("/ask-question/{document_id}", response_model=schemas.QuestionResponse)
 async def ask_question(

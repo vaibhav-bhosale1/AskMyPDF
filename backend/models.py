@@ -13,7 +13,6 @@ class Document(Base):
     filename = Column(String, unique=True, index=True, nullable=False)
     uploaded_at = Column(DateTime(timezone=True), server_default=func.now())
 
-    # Define the relationship to Feedback
     feedbacks = relationship("Feedback", back_populates="document")
 
 
@@ -23,6 +22,6 @@ class Feedback(Base):
     document_id = Column(Integer, ForeignKey("documents.id"), nullable=False)
     question = Column(Text, nullable=False)
     answer = Column(Text, nullable=False)
-    feedback_type = Column(String(50), nullable=False) # <--- THIS MUST BE String (or Text), NOT Boolean
+    feedback_type = Column(String(50), nullable=False) 
     submitted_at = Column(DateTime(timezone=True), server_default=func.now())
     document = relationship("Document", back_populates="feedbacks")
