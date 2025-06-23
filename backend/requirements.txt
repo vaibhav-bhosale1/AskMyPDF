@@ -9,3 +9,4 @@ werkzeug
 psycopg2-binary
 chromadb
 langchain_community
+langchain_google_genai
