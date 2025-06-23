@@ -8,3 +8,4 @@ langchain
 werkzeug
 psycopg2-binary
 chromadb
+langchain_community
