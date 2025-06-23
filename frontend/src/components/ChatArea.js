@@ -1,11 +1,23 @@
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useState } from "react";
+import ThinkingLoader from "./Loader";
 
 export default function ChatArea({ conversation, loading, error, uploadMessage, getUniquePageNumbers, handleFeedback }) {
   const chatEndRef = useRef(null);
+  const [copiedMessageId, setCopiedMessageId] = useState(null);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [conversation]);
+
+  const handleCopy = async (text, messageId) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedMessageId(messageId);
+      setTimeout(() => setCopiedMessageId(null), 2000);
+    } catch (err) {
+      console.error('Failed to copy text: ', err);
+    }
+  };
 
   return (
     <div className="flex-1 overflow-y-auto px-6 lg:px-8 py-4 lg:py-6 space-y-4 lg:space-y-6">
@@ -26,6 +38,13 @@ export default function ChatArea({ conversation, loading, error, uploadMessage, 
             {msg.type === "ai" && (
               <div className="mt-3 flex space-x-2 justify-end">
                 <button
+                  onClick={() => handleCopy(msg.text, msg.id)}
+                  className="p-1 rounded-full text-gray-500 hover:bg-gray-200 hover:text-gray-700 transition-colors"
+                  title={copiedMessageId === msg.id ? "Copied!" : "Copy response"}
+                >
+                  {copiedMessageId === msg.id ? "✓" : "📋"}
+                </button>
+                <button
                   onClick={() => handleFeedback(msg.id, 'positive')}
                   disabled={msg.feedbackGiven}
                   className={`p-1 rounded-full ${msg.feedbackGiven ? 'text-gray-400 cursor-not-allowed' : 'text-green-600 hover:bg-green-100'}`}
@@ -44,7 +63,7 @@ export default function ChatArea({ conversation, loading, error, uploadMessage, 
       ))}
       {loading && (
         <div className="flex items-center justify-center py-4">
-          <div className="text-gray-500 text-sm lg:text-base">Thinking...</div>
+         <ThinkingLoader/>
         </div>
       )}
       {error && (
