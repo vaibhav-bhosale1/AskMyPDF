@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.exc import IntegrityError
 import fitz
-from . import database
+import database
 from dotenv import load_dotenv
 from werkzeug.utils import secure_filename
 import shutil
@@ -19,10 +19,10 @@ from typing import Optional
 
 from langchain_core.documents import Document
 
-from . import nlp_utils
-from . import models
-from . import schemas
-from .database import engine, Base, get_db
+import nlp_utils
+import models
+import schemas
+from database import engine, Base, get_db
 
 load_dotenv()
 
