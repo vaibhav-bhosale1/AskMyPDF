@@ -15,12 +15,16 @@ instance/
 *.egg-info/
 
 # FastAPI/Backend
-backend/pdfs/
+backend/pdfs
 backend/extracted_texts/
 chroma_db/
 backend/__pycache__/
 backend/texts
 backend/*.pyc
+backend/backend/pdfs/
+backend/texts/
+backend/backend/texts/
+
 
 # VSCode
 .vscode/
