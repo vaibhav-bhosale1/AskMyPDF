@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react"
 import DuplicateFileModal from "./components/DuplicateFileModal";
 import ChatArea from "./components/ChatArea";
 import MessageInput from "./components/MessageInput";
-const API_BASE_URL = "http://127.0.0.1:8000"
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://127.0.0.1:8000"
 
 function App() {
   const [selectedFile, setSelectedFile] = useState(null)
